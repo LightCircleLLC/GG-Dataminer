@@ -2,6 +2,7 @@ require('dotenv').config()
 
 const Octokat = require("octokat");
 const puppeteer = require("puppeteer");
+const fs = require("fs");
 
 const github = new Octokat({
     token: process.env.GITHUB_TOKEN,
@@ -416,6 +417,18 @@ async function extractBundle() {
     const currentDate = new Date();
     const year = currentDate.getFullYear(), month = currentDate.getMonth() + 1, day = currentDate.getDate();
 
+    let hashTxt = null;
+    try {
+        hashTxt = fs.readFileSync(`./hash.txt`, "utf8");
+    } catch (e) {
+        // ignore
+    }
+    if (hashTxt == data.gitHash) {
+        console.log("No changes since last check")
+        return;
+    }
+    fs.writeFileSync(`./hash.txt`, data.gitHash);
+    
     const basePath = `${year}/${month}/${data.version}`;
     const repo = await github.repos("Guilded-Datamining", "Guilded-Datamining").fetch();
     let main = await repo.git.refs('heads/main').fetch();
