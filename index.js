@@ -32,6 +32,7 @@ async function extractBundle() {
     console.log('Preparing browser');
     const browser = await puppeteer.launch({
         headless: 'new',
+        args: ['--no-sandbox'],
     });
     console.log('Creating page');
     const page = await browser.newPage();
