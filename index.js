@@ -506,7 +506,7 @@ async function extractBundle() {
         formattedScripts += `- ${data.scripts[i]}\n`;
     }
 
-    let message = `${day} ${currentDate.toLocaleDateString("default", { month: 'long' })} ${day} - Build ${data.version} (${data.gitHash})\nScripts:\n${formattedScripts}`;
+    let message = `${year} ${currentDate.toLocaleDateString("default", { month: 'long' })} ${day} - Build ${data.version} (${data.gitHash})\nScripts:\n${formattedScripts}`;
     let commit = await repo.git.commits.create({
         message: message,
         tree: tree.sha,
