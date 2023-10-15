@@ -496,6 +496,39 @@ async function extractBundle() {
         sha: currentBundleGit.sha,
     });
 
+    let currentGatesGit = await repo.git.blobs.create({
+        content: data.gates.join("\n"),
+        encoding: "utf-8",
+    });
+    treeItems.push({
+        path: `currentGates.txt`,
+        mode: "100644",
+        type: "blob",
+        sha: currentGatesGit.sha,
+    });
+
+    let currentGamesGit = await repo.git.blobs.create({
+        content: data.games.join("\n"),
+        encoding: "utf-8",
+    });
+    treeItems.push({
+        path: `currentGames.txt`,
+        mode: "100644",
+        type: "blob",
+        sha: currentGamesGit.sha,
+    });
+
+    let currentEndpointsGit = await repo.git.blobs.create({
+        content: formattedEndpoints.join("\n"),
+        encoding: "utf-8",
+    });
+    treeItems.push({
+        path: `currentEndpoints.txt`,
+        mode: "100644",
+        type: "blob",
+        sha: currentEndpointsGit.sha,
+    });
+
     let tree = await repo.git.trees.create({
         tree: treeItems,
         base_tree: "main",
