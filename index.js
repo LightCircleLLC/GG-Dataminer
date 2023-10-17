@@ -42,16 +42,25 @@ async function extractBundle() {
     page.on("domcontentloaded", async () => {
         console.log('Document loaded');
         extractedData = await page.evaluate(() => {
-            const ENDPOINT_ARGS_REGEX = /\s*\({([\w:,\s]+)}\)\s*=>/;
+            const ENDPOINT_ARGS_REGEX = /\s*\({([\w:,\s=!\{\}"]+)}\)\s*=>/;
+            const ENDPOINT_ARGS_2_REGEX = /\s*\({([\w:,\s=!]+)}={[\w:,\s]*}\)\s*/;
+            const ENDPOINT_ARGS_3_REGEX = /\w+\(\{?([\w:,\s=!]+)\}?\){/;
+            const ENDPOINT_ARGS_SINGLE_REGEX = /\s*([\w:,\s]+)=>\(/;
+            const ENDPOINT_ARGS_SINGLE_2_REGEX = /\s*([\w:,\s]+)=>\{/;
             const ENDPOINT_BODY_REGEX = /data:\s*JSON.stringify\({([\w:,\s]+)}\)/;
-            const ENDPOINT_URL_REGEX = /url:\s*([\w:,"\.\s()+=?!{}/]+),\s*type/;
+            const ENDPOINT_URL_REGEX = /url:\s*([\w:,"\.\s()&+=\-?!{}/|]+),\s*type/;
             const ENDPOINT_TYPE_REGEX = /type:\s*"([\w]+)"/;
             const ENDPOINT_URL_CONCAT_REGEX = /\.concat\(([\w.,"/]+)\)/g;
             const ENDPOINT_ENCODE_REGEX = /encodeURIComponent\(([\w.,"/]+)\)/;
+            const GATE_RETURN_REGEX = /return\s*([\w!.|"()]+)}/;
 
             function stripQuotes(text) {
                 if (text.startsWith('"') && text.endsWith('"')) return text.slice(1, -1);
                 return text;
+            }
+
+            function stripDefault(text) {
+                return text.split("=")[0];
             }
 
             const values = o => (Array.isArray(o) ? o : Object.values(o));
@@ -205,6 +214,50 @@ async function extractBundle() {
                                     if (gates[i].startsWith("__") || gates[i].startsWith("$")) {
                                         gates.splice(i, 1);
                                         i--;
+                                        continue;
+                                    }
+                                    let gate = gates[i];
+                                    try {
+                                        const func = gatesGetter.default.$mobx.values[gate].derivation;
+                                        const funcString = func.toString();
+                                        const ret = GATE_RETURN_REGEX.exec(funcString);
+                                        if (ret) {
+                                            const conditions = ret[1].split("||");
+                                            if (conditions.length > 1) {
+                                                gate += " - ";
+                                                let toConcat = [];
+                                                for (let j = 0; j < conditions.length; j++) {
+                                                    const cond = conditions[j];
+                                                    let negative = !cond.includes("!");
+                                                    if (cond.includes("IsProd")) {
+                                                        toConcat.push("".concat(
+                                                            negative ? "Enabled in "
+                                                            : "Disabled in ",
+                                                            "Production"
+                                                        ));
+                                                    }
+                                                    else if (cond.includes("IsDev")) {
+                                                        toConcat.push("".concat(
+                                                            negative ? "Enabled in "
+                                                            : "Disabled in ",
+                                                            "Development"
+                                                        ));
+                                                    }
+                                                    else if (cond.includes("IsTest")) {
+                                                        toConcat.push("".concat(
+                                                            negative ? "Enabled in "
+                                                            : "Disabled in ",
+                                                            "Testing"
+                                                        ));
+                                                    }
+                                                }
+                                                gate += toConcat.join(", ");
+                                                gates[i] = gate;
+                                            }
+                                        }
+                                        log(gates[i])
+                                    } catch (e) {
+                                        log(`Failed to parse gate "${gates[i]}": ${e}`)
                                     }
                                 }
 
@@ -212,6 +265,9 @@ async function extractBundle() {
                                 const baseUrls = WEBPACK_GRABBER.require(WEBPACK_GRABBER.findId("BaseUrl"));
                                 log('Located base URLs')
                                 const baseUrl = baseUrls.default.BaseUrl;
+                                const baseVideoUrl = baseUrls.default.BaseVideoUrl || "[BASE_VIDEO_URL]";
+                                // This seems to only be present in developer or local environments,
+                                // so just replace it with a placeholder instead if not present
 
                                 log('Locating endpoints...')
                                 const endpointObject = WEBPACK_GRABBER.require(WEBPACK_GRABBER.findId("getUserById:"));
@@ -227,16 +283,65 @@ async function extractBundle() {
                                         const _type = ENDPOINT_TYPE_REGEX.exec(funcString);
                                         const _body = ENDPOINT_BODY_REGEX.exec(funcString);
                                         const _args = ENDPOINT_ARGS_REGEX.exec(funcString);
+                                        const _args2 = ENDPOINT_ARGS_2_REGEX.exec(funcString);
+                                        const _args3 = ENDPOINT_ARGS_3_REGEX.exec(funcString);
+                                        const _argsSingle = ENDPOINT_ARGS_SINGLE_REGEX.exec(funcString);
+                                        const _argsSingle2 = ENDPOINT_ARGS_SINGLE_2_REGEX.exec(funcString);
+
+                                        if (!_url && !_type && !_body && !_args && !_args2 && !_args3 && !_argsSingle) {
+                                            continue;
+                                            // This is an impossible function to analyze, just skip it
+                                        }
 
                                         let args = {};
                                         if (_args) {
                                             let sep = _args[1].split(",");
                                             for (let i = 0; i < sep.length; i++) {
                                                 let split = sep[i].split(":");
-                                                args[split[1].trim()] = split[0].trim();
+                                                if (split.length == 2) {
+                                                    args[stripDefault(split[1].trim())] = split[0].trim();
+                                                } else {
+                                                    args[stripDefault(split[0].trim())] = `unnamed(${stripDefault(split[0].trim())})`;
+                                                }
                                             }
                                         }
+                                        if (_argsSingle) {
+                                            args[_argsSingle[1]] = "unnamed";
+                                        }
+                                        if (_argsSingle2) {
+                                            args[_argsSingle2[1]] = "unnamed";
+                                        }
+                                        if (_args2) {
+                                            let sep = _args2[1].split(",");
+                                            for (let i = 0; i < sep.length; i++) {
+                                                let split = sep[i].split(":");
+                                                if (split.length == 2) {
+                                                    args[stripDefault(split[1].trim())] = split[0].trim();
+                                                } else {
+                                                    args[stripDefault(split[0].trim())] = `unnamed(${stripDefault(split[0].trim())})`;
+                                                }
+                                            }
+                                        }
+                                        if (_args3) {
+                                            let sep = _args3[1].split(",");
+                                            for (let i = 0; i < sep.length; i++) {
+                                                let split = sep[i].split(":");
+                                                if (split.length == 2) {
+                                                    args[stripDefault(split[1].trim())] = split[0].trim();
+                                                } else {
+                                                    args[stripDefault(split[0].trim())] = `unnamed(${stripDefault(split[0].trim())})`;
+                                                }
+                                            }
+                                        
+                                        }
                                         const argKeys = Object.keys(args);
+
+                                        for (let i = 0; i < argKeys.length; i++) {
+                                            let match = (new RegExp(`(\\w+):(\\w+)\}=${argKeys[i]}`)).exec(funcString);
+                                            if (match) {
+                                                args[match[2]] = match[1];
+                                            }
+                                        }
 
                                         function parseURL(__url) {
                                             const _url = [undefined, __url];
@@ -256,6 +361,13 @@ async function extractBundle() {
                                             let url = "";
                                             let _urlConcats;
                                             let _urlCI = 0;
+                                            if (_url[1].includes("BaseUrl+")) {
+                                                url += baseUrl;
+                                                _urlCI++;
+                                            } else if (_url[1].includes("BaseVideoUrl+")) {
+                                                url += baseVideoUrl;
+                                                _urlCI++;
+                                            }
                                             do {
                                                 _urlConcats = ENDPOINT_URL_CONCAT_REGEX.exec(_url[1]);
                                                 if (_urlConcats) {
@@ -270,6 +382,8 @@ async function extractBundle() {
                                                             let p1Split = p1.split(".");
                                                             if (p1.toLowerCase().includes("baseurl")) {
                                                                 p1 = baseUrl;
+                                                            } else if (p1.toLowerCase().includes("basevideourl")) {
+                                                                p1 = baseVideoUrl;
                                                             } else {
                                                                 if (args[p1]) {
                                                                     p1 = `<${args[p1].toUpperCase()}>`;
@@ -286,7 +400,7 @@ async function extractBundle() {
                                                                 }
                                                             }
                                                         } else {
-                                                            log(`Failed to find p1 for ${concatArgs[0]} of ${_urlConcats[i]}`);
+                                                            log(`Failed to find p1 for ${concatArgs[0]} of ${_urlConcats[1]}`);
                                                             p1 = "<UNKNOWN>";
                                                         }
                                                         url += "".concat(p1, stripQuotes(concatArgs[1]));
@@ -311,9 +425,6 @@ async function extractBundle() {
                                                                 url += `?${queryName}=<${queryArg.toUpperCase()}>`;
                                                             }
                                                         } else {
-                                                            if (i > 1) {
-                                                                url += "/";
-                                                            }
                                                             url += `<${splitArg[1].toUpperCase()}>`;
                                                         }
                                                     }
@@ -332,6 +443,8 @@ async function extractBundle() {
                                                 if (p1) {
                                                     body[split[0].trim()] = `<${p1.toUpperCase()}>`;
                                                 } else {
+                                                    log(args);
+                                                    log(funcString);
                                                     log(split[1].trim().split(".")[0]);
                                                 }
                                             }
@@ -365,6 +478,13 @@ async function extractBundle() {
                                         games.push(`${game.codeFriendlyName};${game.gameIndex};${game.id};${game.icon};${game.color}`);
                                     }
                                 }
+
+                                games = games.sort((a, b) => {
+                                    const nameA = a.split(";")[0];
+                                    const nameB = b.split(";")[0];
+
+                                    return nameA.localeCompare(nameB);
+                                });
 
                                 let scriptUrls = [];
                                 let scripts = document.querySelectorAll("link[as=\"script\"]");
@@ -413,10 +533,16 @@ async function extractBundle() {
     return extractedData;
 }
 
+const WRITE_COMMIT = true;
+
 ( async () => {
     const data = await extractBundle();
     const currentDate = new Date();
     const year = currentDate.getFullYear(), month = currentDate.getMonth() + 1, day = currentDate.getDate();
+
+    if (!WRITE_COMMIT) {
+        return;
+    }
 
     let hashTxt = null;
     try {
@@ -450,7 +576,7 @@ async function extractBundle() {
     for (let i = 0; i < data.endpoints.length; i++) {
         const endpoint = data.endpoints[i];
         if (endpoint.url == undefined || endpoint.url.trim() == "") continue;
-        formattedEndpoints.push(`[${endpoint.type}] ${endpoint.url} - ${endpoint.args} : ${endpoint.body}`);
+        formattedEndpoints.push(`[${endpoint.type}] "${endpoint.name}" ${endpoint.url} - ${endpoint.body}`);
     }
     let endpointsGit = await repo.git.blobs.create({
         content: formattedEndpoints.join("\n"),
