@@ -51,6 +51,7 @@ async function extractBundle() {
             const ENDPOINT_URL_REGEX = /url:\s*([\w:,"\.\s()&+=\-?!{}/|]+),\s*type/;
             const ENDPOINT_TYPE_REGEX = /type:\s*"([\w]+)"/;
             const ENDPOINT_URL_CONCAT_REGEX = /\.concat\(([\w.,"/]+)\)/g;
+            const ENDPOINT_URL_STRING_REGEX = /([\w"\.\/]+)\s*\+(\s*[\w"\.\/]+)/;
             const ENDPOINT_ENCODE_REGEX = /encodeURIComponent\(([\w.,"/]+)\)/;
             const GATE_RETURN_REGEX = /return\s*([\w!.|"()]+)}/;
 
@@ -359,77 +360,96 @@ async function extractBundle() {
                                                 }
                                             }
                                             let url = "";
-                                            let _urlConcats;
                                             let _urlCI = 0;
-                                            if (_url[1].includes("BaseUrl+")) {
-                                                url += baseUrl;
-                                                _urlCI++;
-                                            } else if (_url[1].includes("BaseVideoUrl+")) {
-                                                url += baseVideoUrl;
-                                                _urlCI++;
-                                            }
-                                            do {
-                                                _urlConcats = ENDPOINT_URL_CONCAT_REGEX.exec(_url[1]);
-                                                if (_urlConcats) {
+                                            let _urlStrings = ENDPOINT_URL_STRING_REGEX.exec(_url[1]);
+                                            if (_urlStrings && !ENDPOINT_URL_CONCAT_REGEX.test(_url[1])) {
+                                                const leftSide = _urlStrings[1];
+                                                let rightSide = stripQuotes(_urlStrings[2]);
+
+                                                if (leftSide.includes("BaseUrl")) {
+                                                    url += baseUrl;
+                                                } else if (leftSide.includes("BaseVideoUrl")) {
+                                                    url += baseVideoUrl;
+                                                }
+
+                                                if (rightSide.includes("encodeURIComponent")) {
+                                                    rightSide = ENDPOINT_ENCODE_REGEX.exec(rightSide)[1];
+                                                }
+                                                url += rightSide;
+                                            } else {
+                                                let _urlConcats;
+                                                if (_url[1].includes("BaseUrl+")) {
+                                                    url += baseUrl;
                                                     _urlCI++;
-                                                    let concatArgs = _urlConcats[1].split(",");
-                                                    if (concatArgs.length == 2) {
-                                                        let p1 = stripQuotes(concatArgs[0]);
-                                                        if (p1.includes("encodeURIComponent")) {
-                                                            p1 = ENDPOINT_ENCODE_REGEX.exec(p1)[1];
-                                                        }
-                                                        if (p1) {
-                                                            let p1Split = p1.split(".");
-                                                            if (p1.toLowerCase().includes("baseurl")) {
-                                                                p1 = baseUrl;
-                                                            } else if (p1.toLowerCase().includes("basevideourl")) {
-                                                                p1 = baseVideoUrl;
-                                                            } else {
-                                                                if (args[p1]) {
-                                                                    p1 = `<${args[p1].toUpperCase()}>`;
+                                                } else if (_url[1].includes("BaseVideoUrl+")) {
+                                                    url += baseVideoUrl;
+                                                    _urlCI++;
+                                                }
+                                                ENDPOINT_URL_CONCAT_REGEX.lastIndex = 0;
+                                                do {
+                                                    _urlConcats = ENDPOINT_URL_CONCAT_REGEX.exec(_url[1]);
+                                                    if (_urlConcats) {
+                                                        _urlCI++;
+                                                        if (url.length > 0 && !url.endsWith("/")) url += "/";
+                                                        let concatArgs = _urlConcats[1].split(",");
+                                                        if (concatArgs.length == 2) {
+                                                            let p1 = stripQuotes(concatArgs[0]);
+                                                            if (p1.includes("encodeURIComponent")) {
+                                                                p1 = ENDPOINT_ENCODE_REGEX.exec(p1)[1];
+                                                            }
+                                                            if (p1) {
+                                                                let p1Split = p1.split(".");
+                                                                if (p1.toLowerCase().includes("baseurl")) {
+                                                                    p1 = baseUrl;
+                                                                } else if (p1.toLowerCase().includes("basevideourl")) {
+                                                                    p1 = baseVideoUrl;
                                                                 } else {
-                                                                    if (p1Split.length > 1) {
-                                                                        p1 = `<${p1Split[1].toUpperCase()}>`;
+                                                                    if (args[p1]) {
+                                                                        p1 = `<${args[p1].toUpperCase()}>`;
                                                                     } else {
-                                                                        if (_urlCI == 0) {
-                                                                            p1 = baseUrl; // Assume base URL if unknown and is first item
+                                                                        if (p1Split.length > 1) {
+                                                                            p1 = `<${p1Split[1].toUpperCase()}>`;
                                                                         } else {
-                                                                            p1 = "<UNKNOWN>";
+                                                                            if (_urlCI == 0) {
+                                                                                p1 = baseUrl; // Assume base URL if unknown and is first item
+                                                                            } else {
+                                                                                p1 = "<UNKNOWN>";
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
+                                                            } else {
+                                                                log(`Failed to find p1 for ${concatArgs[0]} of ${_urlConcats[1]}`);
+                                                                p1 = "<UNKNOWN>";
                                                             }
+                                                            url += "".concat(p1, stripQuotes(concatArgs[1]));
                                                         } else {
-                                                            log(`Failed to find p1 for ${concatArgs[0]} of ${_urlConcats[1]}`);
-                                                            p1 = "<UNKNOWN>";
-                                                        }
-                                                        url += "".concat(p1, stripQuotes(concatArgs[1]));
-                                                    } else {
-                                                        let queryName = null;
-                                                        let queryArg = null;
-                                                        let splitArg = concatArgs[0].split(".");
-
-                                                        if (splitArg.length == 1) {
-                                                            for (let j = 0; j < argKeys.length; j++) {
-                                                                const arg = args[argKeys[j]];
-                                                                const argLetter = argKeys[j];
-                                                                let queryString = (new RegExp(`"\?(\w+)=".concat\(.*(${argLetter})\)`)).exec(funcString);
-                                                                if (queryString) {
-                                                                    queryName = queryString[1];
-                                                                    queryArg = arg;
-                                                                    break;
+                                                            let queryName = null;
+                                                            let queryArg = null;
+                                                            let splitArg = concatArgs[0].split(".");
+    
+                                                            if (splitArg.length == 1) {
+                                                                for (let j = 0; j < argKeys.length; j++) {
+                                                                    const arg = args[argKeys[j]];
+                                                                    const argLetter = argKeys[j];
+                                                                    let queryString = (new RegExp(`"\?(\w+)=".concat\(.*(${argLetter})\)`)).exec(funcString);
+                                                                    if (queryString) {
+                                                                        queryName = queryString[1];
+                                                                        queryArg = arg;
+                                                                        break;
+                                                                    }
                                                                 }
+            
+                                                                if (queryName && queryArg) {
+                                                                    url += `?${queryName}=<${queryArg.toUpperCase()}>`;
+                                                                }
+                                                            } else {
+                                                                url += `<${splitArg[1].toUpperCase()}>`;
                                                             }
-        
-                                                            if (queryName && queryArg) {
-                                                                url += `?${queryName}=<${queryArg.toUpperCase()}>`;
-                                                            }
-                                                        } else {
-                                                            url += `<${splitArg[1].toUpperCase()}>`;
                                                         }
                                                     }
-                                                }
-                                            } while (_urlConcats);
+                                                } while (_urlConcats);
+                                            }
                                             return url;
                                         }
                                         let url = parseURL(_url[1]);
@@ -534,15 +554,12 @@ async function extractBundle() {
 }
 
 const WRITE_COMMIT = true;
+const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
 
 ( async () => {
     const data = await extractBundle();
     const currentDate = new Date();
     const year = currentDate.getFullYear(), month = currentDate.getMonth() + 1, day = currentDate.getDate();
-
-    if (!WRITE_COMMIT) {
-        return;
-    }
 
     let hashTxt = null;
     try {
@@ -550,7 +567,7 @@ const WRITE_COMMIT = true;
     } catch (e) {
         // ignore
     }
-    if (hashTxt == data.gitHash) {
+    if (hashTxt == data.gitHash && WRITE_COMMIT) {
         console.log("No changes since last check")
         return;
     }
@@ -577,7 +594,16 @@ const WRITE_COMMIT = true;
         const endpoint = data.endpoints[i];
         if (endpoint.url == undefined || endpoint.url.trim() == "") continue;
         formattedEndpoints.push(`[${endpoint.type}] "${endpoint.name}" ${endpoint.url} - ${endpoint.body}`);
+        if (LOG_ENDPOINTS.includes(endpoint.name)) {
+            console.log(`[${endpoint.type}] "${endpoint.name}" ${endpoint.url} - ${endpoint.body}`);
+            console.log(endpoint._url);
+        }
     }
+
+    if (!WRITE_COMMIT) {
+        return;
+    }
+
     let endpointsGit = await repo.git.blobs.create({
         content: formattedEndpoints.join("\n"),
         encoding: "utf-8",
