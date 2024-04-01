@@ -600,154 +600,6 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
         }
     }
 
-    let webhookPayload = {
-        "content": "<@36931999>",
-        "allowed_mentions": {
-            "roles": [36931999],
-        },
-        "embeds": [
-            {
-                "title": "New Client Version",
-                "description": `A new client version was released.`,
-                "color": 16106496,
-                "fields": [
-                    {
-                        "name": "Version",
-                        "value": data.version,
-                    }
-                ],
-                "footer": {
-                    "text": "Guilded Datamining"
-                },
-                "timestamp": new Date().toISOString(),
-            }
-        ]
-    };
-
-    if (fs.existsSync(`./.cache`)) {
-        const oldEndpoints = fs.readFileSync(`./.cache/endpoints.txt`, "utf8").split("\n");
-        let oldGames = fs.readFileSync(`./.cache/games.txt`, "utf8").split("\n");
-        let oldGates = fs.readFileSync(`./.cache/gates.txt`, "utf8").split("\n");
-
-        let newGates = [];
-        let newGames = [];
-
-        // Make sure all gates in oldGates only include the gate name
-        for (let i = 0; i < oldGates.length; i++) {
-            oldGates[i] = oldGates[i].split(" ")[0];
-        }
-
-        // Create a copy of current gates with only the gate name
-        for (let i = 0; i < data.gates.length; i++) {
-            const gateName = data.gates[i].split(" ")[0];
-            newGates.push(gateName);
-        }
-
-        // Compare the gates
-        let changedGates = {
-            added: [],
-            removed: [],
-        };
-
-        for (let i = 0; i < data.gates.length; i++) {
-            const gateName = data.gates[i].split(" ")[0]; 
-            if (!oldGates.includes(gateName)) {
-                changedGates.added.push(gateName);
-            }
-        }
-
-        for (let i = 0; i < oldGates.length; i++) {
-            const gateName = oldGates[i];
-            if (!newGates.includes(gateName)) {
-                changedGates.removed.push(gateName);
-            }
-        }
-
-        // Make sure all games in oldGames only include the game name
-        for (let i = 0; i < oldGames.length; i++) {
-            oldGames[i] = oldGames[i].split(";")[0];
-        }
-
-        // Create a copy of current games with only the game name
-        for (let i = 0; i < data.games.length; i++) {
-            const gameName = data.games[i].split(";")[0];
-            newGames.push(gameName);
-        }
-
-        let changedGames = {
-            added: [],
-            removed: [],
-        };
-
-        // Compare the games
-        for (let i = 0; i < data.games.length; i++) {
-            const gameName = data.games[i].split(";")[0];
-            if (!oldGames.includes(gameName)) {
-                changedGames.added.push(gameName);
-            }
-        }
-
-        for (let i = 0; i < oldGames.length; i++) {
-            const gameName = oldGames[i];
-            if (!newGames.includes(gameName)) {
-                changedGames.removed.push(gameName);
-            }
-        }
-
-        if (changedGates.added.length > 0 || changedGates.removed.length > 0) {
-            let diff = "```diff\n";
-            if (changedGates.added.length > 0) {
-                for (let i = 0; i < changedGates.added.length; i++) {
-                    diff += `+ ${changedGates.added[i]}\n`;
-                }
-            }
-            if (changedGates.removed.length > 0) {
-                for (let i = 0; i < changedGates.removed.length; i++) {
-                    diff += `- ${changedGates.removed[i]}\n`;
-                }
-            }
-            diff += "```";
-            webhookPayload.embeds[0].fields.push({
-                "name": "Gates",
-                "value": diff,
-            });
-        }
-
-        if (changedGames.added.length > 0 || changedGames.removed.length > 0) {
-            let diff = "```diff\n";
-            if (changedGames.added.length > 0) {
-                for (let i = 0; i < changedGames.added.length; i++) {
-                    diff += `+ ${changedGames.added[i]}\n`;
-                }
-            }
-            if (changedGames.removed.length > 0) {
-                for (let i = 0; i < changedGames.removed.length; i++) {
-                    diff += `- ${changedGames.removed[i]}\n`;
-                }
-            }
-            diff += "```";
-            webhookPayload.embeds[0].fields.push({
-                "name": "Games",
-                "value": diff,
-            });
-        }
-
-        fetch(process.env.WEBHOOK, {
-            method: "POST",
-            body: JSON.stringify(webhookPayload),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        }).then((resp) => {
-            console.log(resp.status);
-        });
-    }
-
-    fs.writeFileSync(`./.cache/bundle.js`, data.bundleCode);
-    fs.writeFileSync(`./.cache/endpoints.txt`, formattedEndpoints.join("\n"));
-    fs.writeFileSync(`./.cache/gates.txt`, data.gates.join("\n"));
-    fs.writeFileSync(`./.cache/games.txt`, data.games.join("\n"));
-
     if (!WRITE_COMMIT) {
         return;
     }
@@ -846,6 +698,155 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
         parents: [main.object.sha],
     });
 
-    main.update({sha: commit.sha});
+    main.update({sha: commit.sha}).then((info) => {
+        let webhookPayload = {
+            "content": "<@36931999>",
+            "allowed_mentions": {
+                "roles": [36931999],
+            },
+            "embeds": [
+                {
+                    "title": "New Client Version",
+                    "url": info.commit.html_url,
+                    "description": `A new client version was released!`,
+                    "color": 16106496,
+                    "fields": [
+                        {
+                            "name": "Version",
+                            "value": data.version,
+                        }
+                    ],
+                    "footer": {
+                        "text": "Guilded Datamining"
+                    },
+                    "timestamp": new Date().toISOString(),
+                }
+            ]
+        };
+
+        if (fs.existsSync(`./.cache`)) {
+            const oldEndpoints = fs.readFileSync(`./.cache/endpoints.txt`, "utf8").split("\n");
+            let oldGames = fs.readFileSync(`./.cache/games.txt`, "utf8").split("\n");
+            let oldGates = fs.readFileSync(`./.cache/gates.txt`, "utf8").split("\n");
+    
+            let newGates = [];
+            let newGames = [];
+    
+            // Make sure all gates in oldGates only include the gate name
+            for (let i = 0; i < oldGates.length; i++) {
+                oldGates[i] = oldGates[i].split(" ")[0];
+            }
+    
+            // Create a copy of current gates with only the gate name
+            for (let i = 0; i < data.gates.length; i++) {
+                const gateName = data.gates[i].split(" ")[0];
+                newGates.push(gateName);
+            }
+    
+            // Compare the gates
+            let changedGates = {
+                added: [],
+                removed: [],
+            };
+    
+            for (let i = 0; i < data.gates.length; i++) {
+                const gateName = data.gates[i].split(" ")[0]; 
+                if (!oldGates.includes(gateName)) {
+                    changedGates.added.push(gateName);
+                }
+            }
+    
+            for (let i = 0; i < oldGates.length; i++) {
+                const gateName = oldGates[i];
+                if (!newGates.includes(gateName)) {
+                    changedGates.removed.push(gateName);
+                }
+            }
+    
+            // Make sure all games in oldGames only include the game name
+            for (let i = 0; i < oldGames.length; i++) {
+                oldGames[i] = oldGames[i].split(";")[0];
+            }
+    
+            // Create a copy of current games with only the game name
+            for (let i = 0; i < data.games.length; i++) {
+                const gameName = data.games[i].split(";")[0];
+                newGames.push(gameName);
+            }
+    
+            let changedGames = {
+                added: [],
+                removed: [],
+            };
+    
+            // Compare the games
+            for (let i = 0; i < data.games.length; i++) {
+                const gameName = data.games[i].split(";")[0];
+                if (!oldGames.includes(gameName)) {
+                    changedGames.added.push(gameName);
+                }
+            }
+    
+            for (let i = 0; i < oldGames.length; i++) {
+                const gameName = oldGames[i];
+                if (!newGames.includes(gameName)) {
+                    changedGames.removed.push(gameName);
+                }
+            }
+    
+            if (changedGates.added.length > 0 || changedGates.removed.length > 0) {
+                let diff = "```diff\n";
+                if (changedGates.added.length > 0) {
+                    for (let i = 0; i < changedGates.added.length; i++) {
+                        diff += `+ ${changedGates.added[i]}\n`;
+                    }
+                }
+                if (changedGates.removed.length > 0) {
+                    for (let i = 0; i < changedGates.removed.length; i++) {
+                        diff += `- ${changedGates.removed[i]}\n`;
+                    }
+                }
+                diff += "```";
+                webhookPayload.embeds[0].fields.push({
+                    "name": "Gates",
+                    "value": diff,
+                });
+            }
+    
+            if (changedGames.added.length > 0 || changedGames.removed.length > 0) {
+                let diff = "```diff\n";
+                if (changedGames.added.length > 0) {
+                    for (let i = 0; i < changedGames.added.length; i++) {
+                        diff += `+ ${changedGames.added[i]}\n`;
+                    }
+                }
+                if (changedGames.removed.length > 0) {
+                    for (let i = 0; i < changedGames.removed.length; i++) {
+                        diff += `- ${changedGames.removed[i]}\n`;
+                    }
+                }
+                diff += "```";
+                webhookPayload.embeds[0].fields.push({
+                    "name": "Games",
+                    "value": diff,
+                });
+            }
+    
+            fetch(process.env.WEBHOOK, {
+                method: "POST",
+                body: JSON.stringify(webhookPayload),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }).then((resp) => {
+                console.log(resp.status);
+            });
+        }
+    
+        fs.writeFileSync(`./.cache/bundle.js`, data.bundleCode);
+        fs.writeFileSync(`./.cache/endpoints.txt`, formattedEndpoints.join("\n"));
+        fs.writeFileSync(`./.cache/gates.txt`, data.gates.join("\n"));
+        fs.writeFileSync(`./.cache/games.txt`, data.games.join("\n"));
+    });
     console.log("Pushed new version successfully");
 })();
