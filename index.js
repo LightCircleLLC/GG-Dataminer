@@ -698,7 +698,7 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
         parents: [main.object.sha],
     });
 
-    main.update({sha: commit.sha}).then((info) => {
+    main.update({sha: commit.sha}).then(() => {
         let webhookPayload = {
             "content": "<@36931999>",
             "allowed_mentions": {
@@ -707,7 +707,7 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
             "embeds": [
                 {
                     "title": "New Client Version",
-                    "url": info.commit.html_url,
+                    "url": commit.htmlUrl,
                     "description": `A new client version was released!`,
                     "color": 16106496,
                     "fields": [
@@ -849,4 +849,5 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
         fs.writeFileSync(`./.cache/games.txt`, data.games.join("\n"));
     });
     console.log("Pushed new version successfully");
+    console.log(commit.htmlUrl);
 })();
