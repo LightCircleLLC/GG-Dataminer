@@ -841,6 +841,17 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
             }).then((resp) => {
                 console.log(resp.status);
             });
+            if (process.env.WEBHOOK_2) {
+                fetch(process.env.WEBHOOK_2, {
+                    method: "POST",
+                    body: JSON.stringify(webhookPayload),
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                }).then((resp) => {
+                    console.log(resp.status);
+                });
+            }
         }
     
         fs.writeFileSync(`./.cache/bundle.js`, data.bundleCode);
