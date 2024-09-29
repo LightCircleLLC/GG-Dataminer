@@ -5,7 +5,7 @@ const puppeteer = require("puppeteer");
 const fs = require("fs");
 
 const github = new Octokat({
-    token: process.env.GITHUB_TOKEN,
+    token: process.env.ACCESS_TOKEN,
 });
 
 async function extractBundle() {
