@@ -1,12 +1,12 @@
 {
   "name": "guilded-dataminer",
   "version": "1.0.0",
-  "description": "Extracts data about Guilded's version and bundle to automatically upload to GitHub",
+  "description": "Extracts data about Guilded's version and bundle to automatically upload to GitHub.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Reapimus",
+  "author": "Reisonancia",
   "license": "GPL-3.0-or-later",
   "dependencies": {
     "dotenv": "^16.3.1",
