@@ -832,7 +832,7 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
                 });
             }
     
-            fetch(process.env.WEBHOOK, {
+            fetch(process.env.GUILDED_WEBHOOK, {
                 method: "POST",
                 body: JSON.stringify(webhookPayload),
                 headers: {
