@@ -32,3 +32,4 @@ jobs:
           git push
         env:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          GUILDED_WEBHOOK: ${{ secrets.GUILDED_WEBHOOK}}
