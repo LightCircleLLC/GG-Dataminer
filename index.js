@@ -574,7 +574,7 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
     fs.writeFileSync(`./hash.txt`, data.gitHash);
     
     const basePath = `${year}/${month}/${data.version}`;
-    const repo = await github.repos("LightCircleLLC/Guilded-Datamining", "LightCircleLLC/Guilded-Datamining").fetch();
+    const repo = await github.repos("LightCircleLLC", "Guilded-Datamining").fetch();
     let main = await repo.git.refs('heads/main').fetch();
     let treeItems = [];
 
