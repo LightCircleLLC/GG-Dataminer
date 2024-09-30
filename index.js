@@ -8,6 +8,10 @@ const github = new Octokat({
     token: process.env.ACCESS_TOKEN,
 });
 
+// Logging for debugging
+console.log('Access Token is set:', !!process.env.ACCESS_TOKEN);
+console.log('Guilded Webhook is set:', !!process.env.GUILDED_WEBHOOK);
+
 async function extractBundle() {
     function extractPrivateCache(wreq) {
         let cache = null;
