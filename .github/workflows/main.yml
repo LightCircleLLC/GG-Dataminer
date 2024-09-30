@@ -22,6 +22,9 @@ jobs:
 
       - name: Run the dataminer
         run: node index.js
+        env:
+          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          GUILDED_WEBHOOK: ${{ secrets.GUILDED_WEBHOOK }}
 
       - name: Commit and push changes
         run: |
@@ -32,4 +35,3 @@ jobs:
           git push
         env:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-          GUILDED_WEBHOOK: ${{ secrets.GUILDED_WEBHOOK}}
