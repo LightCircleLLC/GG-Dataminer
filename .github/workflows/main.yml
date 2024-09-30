@@ -25,18 +25,3 @@ jobs:
         env:
           ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
           GUILDED_WEBHOOK: ${{ secrets.GUILDED_WEBHOOK }}
-
-      - name: Commit and push changes
-        run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "Reisonancia"
-          if [ -n "$(git status --porcelain)" ]; then
-            git add .
-            git commit -m "Update data"
-            git push
-          else
-            echo "No changes to commit."
-          fi
-        env:
-          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-          GUILDED_WEBHOOK: ${{ secrets.GUILDED_WEBHOOK }}
