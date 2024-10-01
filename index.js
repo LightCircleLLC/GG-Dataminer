@@ -701,10 +701,6 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
 
     main.update({sha: commit.sha}).then(() => {
         let webhookPayload = {
-            "content": "<@36931999>",
-            "allowed_mentions": {
-                "roles": [36931999],
-            },
             "embeds": [
                 {
                     "title": "New Client Version",
@@ -718,7 +714,8 @@ const LOG_ENDPOINTS = ["getUserById", "getUserGifs", "createInvite"];
                         }
                     ],
                     "footer": {
-                        "text": "Guilded Datamining"
+                        "text": "Light Circle LLC - Guilded Datamining",
+                        "icon_url": "https://raw.githubusercontent.com/LightCircleLLC/Eclipse/refs/heads/main/Assets/Light%20Circle%20Official%20Branding/Eclipse%20Project%20Logo%20v1.png"
                     },
                     "timestamp": new Date().toISOString(),
                 }
